@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Fuck That! golf flag</title>
+  <desc id="desc">A lime windblown golf flag with an exclamation-mark stem on a deep green rounded square.</desc>
+  <rect width="512" height="512" rx="112" fill="#183c2e"/>
+  <path d="M120 385c54-32 162-34 260 0" fill="none" stroke="#3b654b" stroke-width="16" stroke-linecap="round"/>
+  <path d="M216 148c50-45 98 45 158 0v112c-60 45-108-45-158 0Z" fill="#d8ed9b"/>
+  <path d="M216 148v175" fill="none" stroke="#d8ed9b" stroke-width="27" stroke-linecap="round"/>
+  <circle cx="216" cy="372" r="19" fill="#d8ed9b"/>
+</svg>
