@@ -4,7 +4,11 @@
   const storageKey = 'ftg-analytics-consent-v1';
   const panel = document.getElementById('analytics-choice');
   const preferences = document.getElementById('analytics-preferences');
-  if (location.hostname !== 'ptylr.github.io' || !location.pathname.startsWith('/fuck-that/')) return;
+  const legacySite = location.hostname === 'ptylr.github.io' && location.pathname.startsWith('/fuck-that/');
+  const customSite = ['fuckthat.golf', 'www.fuckthat.golf'].includes(location.hostname);
+  if (!legacySite && !customSite) return;
+  const cookiePath = legacySite ? '/fuck-that/' : '/';
+  const cookieDomain = legacySite ? 'ptylr.github.io' : 'fuckthat.golf';
   const disableKey = `ga-disable-${measurementId}`;
   let started = false;
   let choice = null;
@@ -28,7 +32,7 @@
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
       cookie_prefix: 'ftg',
-      cookie_path: '/fuck-that/',
+      cookie_path: cookiePath,
       page_location: location.origin + location.pathname,
     });
     const script = document.createElement('script');
@@ -43,8 +47,9 @@
     for (const entry of document.cookie.split(';')) {
       const name = entry.trim().split('=')[0];
       if (!/^ftg_ga(?:_|$)/.test(name)) continue;
-      for (const domain of ['', '; Domain=ptylr.github.io', '; Domain=.ptylr.github.io']) {
-        document.cookie = `${name}=; Max-Age=0; Path=/fuck-that/${domain}; SameSite=Lax; Secure`;
+      for (const domain of new Set(['', location.hostname, `.${location.hostname}`, cookieDomain, `.${cookieDomain}`])) {
+        const scope = domain ? `; Domain=${domain}` : '';
+        document.cookie = `${name}=; Max-Age=0; Path=${cookiePath}${scope}; SameSite=Lax; Secure`;
       }
     }
   }
