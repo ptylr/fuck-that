@@ -32,6 +32,8 @@
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
       cookie_prefix: 'ftg',
+      cookie_expires: 63072000, // Two years; disclosed in Data & privacy.
+      cookie_update: true,
       cookie_path: cookiePath,
       page_location: location.origin + location.pathname,
     });

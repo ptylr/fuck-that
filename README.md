@@ -1,21 +1,11 @@
 # Fuck That!
 
-A very sweary seven-day golf forecast. Serious weather data, deeply unserious verdicts.
+A sweary seven-day golf-weather site at https://fuckthat.golf/, operated by Sevalor Ltd. The current directory contains 2,723 mapped UK outdoor golf venues and 2,788 saveable layouts. Community map coverage can contain omissions, closures or layout errors.
 
-Open `index.html` directly in a modern browser, or visit https://ptylr.github.io/fuck-that/. No installation, Node service, backend or API credentials. JavaScript requests live forecasts on load and Refresh.
+Serve this directory over HTTP or HTTPS. Browser JavaScript requests current weather for the selected course or visible shortlist. Saved clubs and an optional approximate area stay in the visitor's browser. Every club and named layout has a normal document URL. Optional Google Analytics loads only after acceptance.
 
-Five courses: Stratford-on-Avon, Western Gailes, Kilmarnock Barassie, Gailes Links and Dundonald Links. Click any day for the weather measurements, individual forecast models, course ranking evidence and score calculation.
+Scores use weather only: (100 − weather quality) ÷ 10. Weather quality weights wind 35%, rain 35%, temperature 15% and feels-like temperature 15%. Scores 0–4.0: Great; 4.1–8.9: Questionable; 9–10: Fuck that. At least two model forecasts predicting severe conditions impose a 9.5 minimum. This does not establish whether a course is open or safe; check official warnings and the club.
 
-UK Met Office, ECMWF IFS, NOAA GFS and DWD ICON model families are supplied through [Open-Meteo](https://open-meteo.com/). Available complete model forecasts are averaged equally; BBC Weather RSS supplements the first three days. Models can share inputs and some fields can be derived. Missing forecasts are excluded and model disagreement is flagged. Apple Weather and Metcheck are comparison links, not numeric inputs.
+Club locations: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). Forecasts: [Open-Meteo](https://open-meteo.com/), generally [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); UK Met Office data and derived blends/scores containing it: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). No publisher rankings, course-quality assessments, BBC feeds or third-party course photographs are used.
 
-Weather quality is 0–100, with wind and rain weighted 35% each and temperature and feels-like weighted 15% each. The final score is `0.08 × (100 − weather) + 0.02 × (100 − course)`, capped at ten, with a minimum 9.5 when any model forecasts severe conditions. Course quality is an editorial calibration informed by linked published rankings, not a publisher’s score. The full method is explained on the page.
-
-Scores 0–3: get the clubs in. Scores 3–6: Creedy might play, but the rest of us aren’t so sure. Scores 6–10: fuck that. This does not establish whether a course is open or replace official weather warnings.
-
-## Attribution
-
-Open-Meteo data is [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), with [UK Met Office data](https://open-meteo.com/en/docs/ukmo-api) and the derived forecast blend/scores under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). BBC Weather RSS is used for this non-commercial project. Course photographs are loaded from credited third-party source sites and remain copyright of their respective owners; the data licences do not apply to those photographs.
-
-## Hosting
-
-GitHub Pages serves `index.html` directly from the root of `main`. Only this standalone app is published here.
+See [Data & privacy](https://fuckthat.golf/data-and-privacy/) for source notices, catalogue availability, storage and Analytics choices, and the public contact info@sevalor.co. GitHub Pages serves this static directory from main; there is no application server or API credential in the site.
