@@ -22,12 +22,12 @@ const FT = (() => {
     const value=round(clamp(severe?Math.max(raw,9.5):raw,0,10));
     return {value,weather:round(weather),wind:round(wind),rain:round(rain),temp:round(blended),feels:round(feels),weatherPoints,severe,severeSources,bbcTemp,disagree:!!w.modelDisagree||(bbcTemp!==null&&Math.abs(w.temp-w.bbc.temp)>=5)};
   }
-  const band=value=>value<=4?'good':value<9?'mid':'bad';
+  const band=value=>value<5?'good':value<8?'mid':'bad';
   function reason(w,s){
     if(s.severe)return 'The weather’s properly fucked. Even your all-weather mate can sit this bastard out.';
     if(s.disagree)return 'The forecasters can’t agree worth a fuck. Check the individual forecasts before deciding.';
-    if(s.value<=4)return 'The weather gets a yes. Find your golf shoes and stop negotiating with the sofa.';
-    if(s.value<9)return 'Could be a round. Could be the pub. Check the wind, rain and temperature before committing.';
+    if(s.value<5)return 'The weather gets a yes. Find your golf shoes and stop negotiating with the sofa.';
+    if(s.value<8)return 'Could be a round. Could be the pub. Check the wind, rain and temperature before committing.';
     const worst=[['wind',s.wind],['rain',s.rain],['feels',s.feels],['temperature',s.temp]].sort((a,b)=>a[1]-b[1])[0];
     if(worst[0]==='wind')return 'The wind is doing its best to cancel the round. We’d give this one a miss.';
     if(worst[0]==='rain')return 'Too much rain for our enthusiasm. The golf bag can have the day off.';

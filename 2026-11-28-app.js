@@ -10,7 +10,8 @@ const FTGApp = (() => {
   const verdicts = FTGVerdicts.createPageAllocator();
   const verdict = (course, weather, score) => verdicts.label(score.value, `${course.id}|${weather.date}`);
   let clubs = [], courses = [], prefs, origin = null, view = 'nearby', visible = pageSize, query = '', area = '';
-  let forecasts = new Map(), errors = new Map(), pending = new Map(), queue = [], active = 0, locationRequest = 0, locationPending = false, locationTimer;
+  let forecasts = new Map(), errors = new Map(), pending = new Map(), queue = [], active = 0, locationRequest = 0, locationPending = false, locationTimer, postcodeTimer;
+  const postcodeCache = new Map();
   const clubId = document.body.dataset.club, courseId = document.body.dataset.course;
   const isClub = Boolean(clubId);
   const icon = w => w.codes?.some(c => c >= 95) ? '⛈' : w.codes?.some(c => [71,73,75,77,85,86].includes(c)) ? '❄' : w.rain > 1 ? '🌧' : w.prob > 40 ? '🌦' : w.codes?.some(c => c === 3) ? '☁' : w.codes?.every(c => c === 0) ? '☀' : '⛅';
@@ -29,7 +30,7 @@ const FTGApp = (() => {
   function displayedCourses(club) {
     if (view === 'favourites') return club.courses.filter(c => saved(c.id));
     const words = FTGCore.fold(query).split(' ').filter(Boolean);
-    const courseMatches = words.length && club.courses.filter(c => words.every(w => FTGCore.fold(c.name).includes(w)));
+    const courseMatches = words.length && club.courses.filter(c => words.every(w => FTGCore.fold(club.name+' '+c.name).includes(w)));
     return courseMatches?.length ? courseMatches : [club.courses[0]];
   }
   function homeResults() {
@@ -40,7 +41,7 @@ const FTGApp = (() => {
   function renderHome({ loadForecasts = true } = {}) {
     if (view === 'favourites' && !prefs.state.favourites.length) { view = 'nearby'; visible = pageSize; }
     const list = homeResults(), showing = list.slice(0,visible);
-    $('results-title').textContent = view === 'favourites' ? 'Saved clubs' : query || area ? 'Find your next round' : origin ? `Clubs near ${origin.label}` : 'Clubs around Stratford';
+    $('results-title').textContent = view === 'favourites' ? 'Saved clubs' : query ? `Clubs matching “${query}”` : area ? 'Find your next round' : origin ? `Clubs near ${origin.label}` : 'Clubs around Stratford';
     $('result-count').textContent = `${list.length} club${list.length === 1 ? '' : 's'}${origin ? ' · approximate straight-line distance' : ''}`;
     $('view-favourites').setAttribute('aria-pressed', String(view === 'favourites'));
     $('view-nearby').setAttribute('aria-pressed', String(view === 'nearby'));
@@ -138,34 +139,114 @@ const FTGApp = (() => {
     await Promise.all(jobs);
   }
   function cancelLocation() {
-    ++locationRequest; clearTimeout(locationTimer);
-    if (locationPending) { locationPending=false; locationStatus(''); }
+    ++locationRequest; clearTimeout(locationTimer);clearTimeout(postcodeTimer);
+    if (locationPending) {locationPending=false;locationStatus('');if(!isClub){$('search-submit').disabled=false;$('search-submit').textContent='Search';}}
   }
   function setView(next) {
     cancelLocation();
-    if(next==='favourites'){query='';area='';$('club-search').value='';$('area-filter').value='';}
+    hideSearchPreview();
+    if(next==='favourites'){query='';area='';$('club-search').value='';$('area-filter').value='';renderSearchPreview();}
     view=next; visible=pageSize; renderHome();
   }
-  async function postcode(event) {
-    event.preventDefault(); cancelLocation(); const token=++locationRequest;
-    const value=$('postcode').value.trim().replace(/\s+/g,'');
-    if (!/^(?:GIR0AA|[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2})$/i.test(value)) { locationStatus('Enter a full UK postcode, such as SW1A 1AA.',true); return; }
-    locationPending=true;
-    locationStatus('Finding that postcode…');
+  function searchMessage(text,error=false) {
+    $('search-status').textContent=text;
+    $('search-status').className=error?'search-status error':'search-status';
+  }
+  function hideSearchPreview() { $('search-preview').hidden=true; }
+  function renderSearchPreview() {
+    const input=FTGCore.searchInput($('club-search').value), panel=$('search-preview');
+    $('club-search').setAttribute('aria-invalid','false');
+    $('search-submit').disabled=false;
+    panel.innerHTML='';panel.hidden=true;
+    if(input.kind==='empty'){
+      $('search-submit').textContent='Search';
+      searchMessage('Club matches appear as you type. Postcodes find nearby clubs after a short pause.');return;
+    }
+    if(input.kind==='postcode' || input.kind==='partial-postcode'){
+      $('search-submit').textContent='Find nearby';
+      searchMessage(FTGCore.postcodeLookup(input.value)?'Pause typing to see nearby clubs, or choose Find nearby.':'Keep typing a postcode district (e.g. CV37), sector (CV37 8) or full postcode.');return;
+    }
+    const list=FTGCore.results(clubs,{query:input.value,area,origin});
+    $('search-submit').textContent=list.length?'Show clubs':'Search';
+    searchMessage(list.length?`${list.length} matching club${list.length===1?'':'s'}. Open a match below, or show the matching forecasts.`:'No matching clubs. Try another name, a postcode or clear the county filter.',!list.length);
+    showSearchMatches(list,FTGCore.fold(input.value).split(' ').filter(Boolean));
+  }
+  function showSearchMatches(list,words=[],nearby=false) {
+    const panel=$('search-preview');
+    panel.innerHTML='<ul>'+list.slice(0,4).map(club=>{
+      const matches=words.length?club.courses.filter(c=>words.every(w=>FTGCore.fold(club.name+' '+c.name).includes(w))):[];
+      const course=matches.length===1?matches[0]:null;
+      return `<li><a href="${course?FTGCore.courseURL(course):FTGCore.clubURL(club)}"><strong>${esc(club.name)}</strong><span>${esc(club.area)}${course && club.courses.length>1?' · '+esc(course.name):''}${nearby?' · '+club.distance.toFixed(1)+' miles':''}</span></a></li>`;
+    }).join('')+'</ul>'+(list.length>4?`<button type="button" class="preview-all" id="search-all">${nearby?'Show nearby forecasts':`Show all ${list.length} matching clubs`}</button>`:'');
+    panel.hidden=!list.length;
+  }
+  function schedulePostcode() {
+    const lookup=FTGCore.postcodeLookup($('club-search').value);
+    if(lookup)postcodeTimer=setTimeout(()=>postcode($('club-search').value,{automatic:true}),450);
+  }
+  function focusResults() {
+    hideSearchPreview();
+    $('results-title').focus({preventScroll:true});
+    $('results-title').scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  }
+  async function submitSearch(event) {
+    event?.preventDefault();cancelLocation();hideSearchPreview();
+    const input=FTGCore.searchInput($('club-search').value);
+    if(input.kind==='partial-postcode' && !FTGCore.postcodeLookup(input.value)){
+      searchMessage('Enter a postcode district (CV37), sector (CV37 8) or full UK postcode.',true);
+      $('club-search').setAttribute('aria-invalid','true');return;
+    }
+    if(FTGCore.postcodeLookup(input.value)){await postcode(input.value);return;}
+    query=input.value;view='nearby';visible=pageSize;renderHome();
+    searchMessage(query?`Showing forecasts for clubs matching “${query}”.`:'Showing clubs in your selected area.');
+    focusResults();
+  }
+  async function lookupPostcode(lookup) {
+    if(!postcodeCache.has(lookup.path)){
+      const request=getJSON('https://api.postcodes.io/'+lookup.path).then(data=>{
+        const rows=Array.isArray(data.result)?data.result:[data.result];
+        const points=rows.filter(r=>r && FTGCore.validPoint({lat:r.latitude,lon:r.longitude}));
+        if(!points.length)throw Error('Postcode not found');
+        // Prefix matches are capped by the provider: this is a representative area, not an exact sector boundary.
+        const district=points[0].admin_district;
+        const label=(Array.isArray(district)?district.join(', '):district)||'chosen postcode area';
+        return {lat:points.reduce((sum,r)=>sum+r.latitude,0)/points.length,lon:points.reduce((sum,r)=>sum+r.longitude,0)/points.length,label:label+(lookup.approximate?' (approximate area)':'')};
+      }).catch(error=>{postcodeCache.delete(lookup.path);throw error;});
+      postcodeCache.set(lookup.path,request);
+    }
+    return postcodeCache.get(lookup.path);
+  }
+  async function postcode(value,{automatic=false}={}) {
+    const lookup=FTGCore.postcodeLookup(value);
+    if(!lookup)return;
+    const token=++locationRequest;locationPending=true;
+    $('search-submit').disabled=!automatic;$('search-submit').textContent=automatic?'Find nearby':'Finding…';
+    searchMessage(`Finding clubs near ${lookup.value}…`);
+    if(!automatic)locationStatus('');
     try {
-      const data=await getJSON('https://api.postcodes.io/postcodes/'+encodeURIComponent(value));
-      const r=data.result;
-      if (!r || !FTGCore.validPoint({lat:r.latitude,lon:r.longitude})) throw Error('Postcode not found. Check it and try again.');
-      if (token!==locationRequest) return;
+      const point=await lookupPostcode(lookup);
+      if(token!==locationRequest)return;
       locationPending=false;
-      origin={lat:r.latitude,lon:r.longitude,label:r.admin_district || r.outcode || 'chosen postcode area'};
-      locationStatus('Area updated for this visit. Use “Remember this area” to save it on this browser.');
+      $('search-submit').disabled=false;$('search-submit').textContent='Find nearby';
+      if(automatic){
+        showSearchMatches(FTGCore.results(clubs,{origin:point}),[],true);
+        searchMessage(`Clubs nearest ${lookup.value}${lookup.approximate?' (approximate area)':''}. Keep typing to refine, open a club or choose Find nearby for forecasts.`);
+        return;
+      }
+      origin=point;query='';area='';$('area-filter').value='';
+      locationStatus('Area updated for this visit. “Remember this area” is under County & saved area.');
       setView('nearby');
-    } catch { if(token===locationRequest) { locationPending=false; locationStatus('Couldn’t find that postcode. Check it or try again later. Club search still works.',true); } }
+      searchMessage(`Showing nearest clubs around ${origin.label}.`);focusResults();
+    }catch{
+      if(token===locationRequest){locationPending=false;hideSearchPreview();searchMessage('Couldn’t find that postcode or area. Keep typing, check it or try a club name.',true);$('club-search').setAttribute('aria-invalid','true');}
+    }finally{
+      if(token===locationRequest){$('search-submit').disabled=false;$('search-submit').textContent='Find nearby';}
+    }
   }
   function locationStatus(text,error=false) { $('location-status').textContent=text; $('location-status').className=error?'status error':'status'; }
   function nearMe() {
-    const token=++locationRequest; clearTimeout(locationTimer);
+    query='';area='';$('club-search').value='';$('area-filter').value='';renderSearchPreview();
+    const token=++locationRequest; clearTimeout(locationTimer);clearTimeout(postcodeTimer);
     locationPending=true;
     function fallback(message) {
       if(token!==locationRequest)return;
@@ -193,6 +274,7 @@ const FTGApp = (() => {
   }
   function bind() {
     document.addEventListener('click',event=>{
+      if(!isClub && event.target.closest('#search-all')){submitSearch();return;}
       const save=event.target.closest('[data-save]');
       if(save){if(!isClub)cancelLocation();const id=save.dataset.save;const ok=prefs.toggle(id);if(isClub)renderForecast(currentCourse());else renderHome();announce(ok?(saved(id)?'Club saved on this browser.':'Club removed from favourites.'):'Browser storage is unavailable. Your choices work for this visit but won’t be remembered.',!ok);return;}
       const day=event.target.closest('[data-day]');if(day){detail(day.dataset.owner,Number(day.dataset.day));return;}
@@ -208,16 +290,17 @@ const FTGApp = (() => {
         try{if(navigator.share){await navigator.share({title:c.full+' · Fuck That!',url});announce('Club link shared.');}else if(navigator.clipboard){await navigator.clipboard.writeText(url);announce('Club link copied.');}else{announce('Share this club using the address in your browser.');}}catch(e){if(e.name!=='AbortError')announce('Couldn’t share automatically. Copy the address from your browser.',true);}
       });
     }else{
-      let timer;
-      $('club-search').addEventListener('input',e=>{cancelLocation();query=e.target.value;view='nearby';clearTimeout(timer);timer=setTimeout(()=>{visible=pageSize;renderHome();},160);});
-      $('search-form').addEventListener('submit',e=>{e.preventDefault();cancelLocation();query=$('club-search').value;view='nearby';visible=pageSize;renderHome();});
-      $('area-filter').addEventListener('change',e=>{cancelLocation();area=e.target.value;view='nearby';visible=pageSize;renderHome();});
-      $('clear-filters').addEventListener('click',()=>{cancelLocation();query='';area='';$('club-search').value='';$('area-filter').value='';visible=pageSize;renderHome();});
+      $('club-search').addEventListener('input',()=>{cancelLocation();renderSearchPreview();schedulePostcode();if(!$('club-search').value.trim()){query='';view='nearby';visible=pageSize;renderHome();}});
+      $('club-search').addEventListener('focus',()=>{renderSearchPreview();clearTimeout(postcodeTimer);schedulePostcode();});
+      $('club-search').addEventListener('keydown',event=>{if(event.key==='Escape'){cancelLocation();hideSearchPreview();renderHome();}});
+      $('search-form').addEventListener('submit',submitSearch);
+      $('edit-search').addEventListener('click',()=>{$('club-search').focus();$('club-search').scrollIntoView({block:'center',behavior:'smooth'});});
+      $('area-filter').addEventListener('change',e=>{cancelLocation();area=e.target.value;query=FTGCore.searchInput($('club-search').value).kind==='name'?$('club-search').value.trim():'';view='nearby';visible=pageSize;renderHome();renderSearchPreview();focusResults();});
+      $('clear-filters').addEventListener('click',()=>{cancelLocation();query='';area='';$('club-search').value='';$('area-filter').value='';visible=pageSize;view='nearby';renderHome();renderSearchPreview();});
       $('view-favourites').addEventListener('click',()=>setView('favourites'));
       $('view-nearby').addEventListener('click',()=>setView('nearby'));
       $('load-more').addEventListener('click',()=>{cancelLocation();visible+=pageSize;renderHome();});
       $('refresh-shortlist').addEventListener('click',refresh);
-      $('postcode-form').addEventListener('submit',postcode);
       $('near-me').addEventListener('click',nearMe);
       $('remember-area').addEventListener('click',()=>{if(!origin)return;const ok=prefs.remember({...origin,label:origin.label==='your current location'?'saved area':origin.label});announce(ok?'Approximate area saved on this browser. Your precise location was not saved.':'Couldn’t save this area. It still works for this visit.',!ok);});
       $('forget-area').addEventListener('click',()=>{cancelLocation();const ok=prefs.forgetArea();origin=defaultOrigin();locationStatus('Using Stratford-on-Avon Golf Club as the starting area.');renderHome();announce(ok?'Saved area cleared.':'Area cleared for this visit; browser storage is unavailable.',!ok);});

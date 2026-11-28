@@ -224,7 +224,7 @@ const FTGVerdicts = (() => {
   function combine(max,inclusive,name,indexes){
     return {max,inclusive,name,lines:indexes.flatMap(i=>copyBanks[i].lines),starts:[...new Set(indexes.flatMap(i=>copyBanks[i].starts))],ends:[...new Set(indexes.flatMap(i=>copyBanks[i].ends))]};
   }
-  const banks=[combine(4,true,'Great',[0,1]),combine(9,false,'Questionable',[2,3,4]),combine(10,true,'Fuck that',[5,6])];
+  const banks=[combine(5,false,'Great',[0,1]),combine(8,false,'Questionable',[2,3,4]),combine(10,true,'Fuck That!',[5,6])];
   const extras = [
     'Check again before making plans.', 'Keep an eye on the forecast.', 'The numbers can change.', 'Check the detail before deciding.',
     'Leave the final call to the group.', 'That’s our steer for the round.', 'Keep the score in perspective.', 'The detail is worth a look.',
